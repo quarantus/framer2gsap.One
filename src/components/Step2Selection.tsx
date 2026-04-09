@@ -255,7 +255,6 @@ useEffect(() => {
           </div>
         </div>
 {/* Right: Desktop Preview */}
-{/* Right: Desktop Preview */}
 <div className="flex-1 bg-zinc-900 relative flex items-center justify-center overflow-auto p-8">
   <div className="absolute top-6 left-6 z-10 text-xs text-zinc-500 bg-zinc-950/80 px-4 py-2 rounded-xl border border-zinc-800 backdrop-blur">
     Desktop Preview • 1440px • Click sections on left to highlight
