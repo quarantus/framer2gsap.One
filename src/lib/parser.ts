@@ -22,20 +22,16 @@ function getDepth(el: Element): number {
 
 function getLabel(el: Element): string {
   if (el.id) return el.id
-
-  const framerName = el.getAttribute('data-framer-name')
-  if (framerName) return framerName
+  const name = el.getAttribute('data-framer-name')
+  if (name) return name
 
   const heading = el.querySelector('h1, h2, h3, h4, h5, h6')
-  if (heading?.textContent?.trim()) {
-    return heading.textContent.trim().slice(0, 60)
-  }
+  if (heading?.textContent?.trim()) return heading.textContent.trim().slice(0, 55)
 
-  // Framer class fallback
   const framerClass = Array.from(el.classList).find(c => /^framer-[a-z0-9]{5,}/.test(c))
   if (framerClass) return framerClass.replace(/^framer-/, '')
 
-  return `${el.tagName.toLowerCase()}-${getDepth(el)}`
+  return `Section ${getDepth(el)}`
 }
 
 export function parseHTMLSections(htmlString: string): ParsedSection[] {
@@ -44,56 +40,55 @@ export function parseHTMLSections(htmlString: string): ParsedSection[] {
   const parser = new DOMParser()
   const doc = parser.parseFromString(htmlString, 'text/html')
 
-  // Clean junk
-  doc.querySelectorAll('script, meta, link, noscript, iframe, svg').forEach(el => el.remove())
+  doc.querySelectorAll('script, meta, link, noscript, iframe').forEach(el => el.remove())
 
   const candidates = new Set<Element>()
 
-  // 1. Strong Framer containers (most important)
+  // Main strategy for Framer: capture good-sized framer- containers
   doc.querySelectorAll('div').forEach(el => {
     const cls = el.className?.toString() || ''
     if (/framer-[a-z0-9]{5,}/.test(cls)) {
       const count = countElements(el)
-      if (count >= 35) candidates.add(el)           // lowered + balanced
+      if (count >= 30 && count <= 8000) {   // avoid too small and the giant wrapper
+        candidates.add(el)
+      }
     }
   })
 
-  // 2. Elements with IDs or semantic tags
-  doc.querySelectorAll('section, main, article, header, footer, nav, [id]').forEach(el => {
+  // Also take large semantic / ID containers
+  doc.querySelectorAll('section, main, article, [id]').forEach(el => {
     if (el === doc.documentElement || el === doc.body) return
-    if (countElements(el) >= 25) candidates.add(el)
+    if (countElements(el) >= 40) candidates.add(el)
   })
 
-  // 3. Very large top-level children of <body>
+  // Large direct body children
   if (doc.body) {
     Array.from(doc.body.children).forEach(child => {
-      if (countElements(child) >= 80) candidates.add(child)
+      if (countElements(child) >= 100) candidates.add(child)
     })
   }
 
-  // Deduplication: Keep top-level containers, but allow some nesting for better sectioning
-  const sorted = Array.from(candidates).sort((a, b) => 
+  // Deduplication - allow some nesting but not deep
+  const sorted = Array.from(candidates).sort((a, b) =>
     (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1
   )
 
   const filtered: Element[] = []
   for (const el of sorted) {
-    const isDescendant = filtered.some(existing => existing !== el && existing.contains(el))
-    if (!isDescendant) {
-      filtered.push(el)
-    }
+    const isDescendant = filtered.some(existing => existing.contains(el))
+    if (!isDescendant) filtered.push(el)
   }
 
-  // Fallback: if too few sections, take more Framer containers
-  if (filtered.length < 4 && doc.body) {
-    doc.querySelectorAll('div[class*="framer-"]').forEach(el => {
-      if (countElements(el) >= 50 && !filtered.some(f => f.contains(el))) {
-        filtered.push(el)
+  // If still too few, take more framer containers
+  if (filtered.length < 5 && doc.body) {
+    doc.querySelectorAll('div[class*="framer-"]').forEach((el, i) => {
+      if (countElements(el) > 45 && i % 2 === 0) {
+        filtered.push(el as Element)
       }
     })
   }
 
-  return filtered.map((el) => ({
+  return filtered.map(el => ({
     id: nextId(),
     label: getLabel(el),
     elementCount: countElements(el),
