@@ -163,7 +163,7 @@ function ExporterApp() {
       </div>
 
       {/* Slides container */}
-      <div ref={containerRef} className="relative overflow-hidden">
+      <div ref={containerRef} className="relative overflow-hidden min-h-screen">
         <div ref={step1Ref} className="absolute inset-0 min-h-screen" style={{ willChange: 'transform' }}>
           <Step1Upload onFileReady={handleFileReady} />
         </div>
