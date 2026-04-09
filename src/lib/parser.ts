@@ -10,18 +10,17 @@ function countElements(el: Element): number {
   return el.querySelectorAll('*').length + 1
 }
 
-// New: Calculate nesting depth from body
 function getDepth(el: Element): number {
   let depth = 0
-  let current: Element | null = el
-  while (current && current !== document.body && current.parentElement) {
+  let current: Element | null = el.parentElement
+  while (current && current !== document.body) {
     depth++
     current = current.parentElement
   }
   return depth
 }
 
-function getLabel(el: Element, index: number): string {
+function getLabel(el: Element): string {
   if (el.id) return el.id
 
   const framerName = el.getAttribute('data-framer-name')
@@ -29,21 +28,16 @@ function getLabel(el: Element, index: number): string {
 
   const heading = el.querySelector('h1, h2, h3, h4, h5, h6')
   if (heading?.textContent?.trim()) {
-    return heading.textContent.trim().slice(0, 50)
+    return heading.textContent.trim().slice(0, 60)
   }
 
-  // Framer-specific hints
   const variant = el.getAttribute('data-framer-variant')
   if (variant) return variant
 
-  const classList = Array.from(el.classList)
-  const framerClass = classList.find(c => /^framer-[a-z0-9]{5,}/.test(c))
-  if (framerClass) return framerClass.replace('framer-', '')
+  const cls = Array.from(el.classList).find(c => /^framer-[a-z0-9]{5,}/.test(c))
+  if (cls) return cls.replace(/^framer-/, '')
 
-  const cleanClass = classList.find(c => c.length > 4 && c.length < 35)
-  if (cleanClass) return cleanClass
-
-  return `${el.tagName.toLowerCase()}-${index + 1}`
+  return el.tagName.toLowerCase()
 }
 
 export function parseHTMLSections(htmlString: string): ParsedSection[] {
@@ -52,51 +46,39 @@ export function parseHTMLSections(htmlString: string): ParsedSection[] {
   const parser = new DOMParser()
   const doc = parser.parseFromString(htmlString, 'text/html')
 
-  // Clean noise
-  doc.querySelectorAll('script, meta, link, noscript, svg').forEach(el => el.remove())
+  // Aggressive cleaning for performance
+  doc.querySelectorAll('script, meta, link, noscript, svg, iframe').forEach(el => el.remove())
 
   const candidates = new Set<Element>()
 
-  // 1. Semantic elements
-  doc.querySelectorAll('section, main, article, header, footer, nav').forEach(el => {
-    if (countElements(el) >= 10) candidates.add(el)
-  })
-
-  // 2. Elements with IDs
-  doc.querySelectorAll('[id]').forEach(el => {
+  // Semantic + Framer-aware detection
+  const selectors = 'section, main, article, header, footer, nav, [id], [data-framer-name], div'
+  doc.querySelectorAll(selectors).forEach(el => {
     if (el === doc.documentElement || el === doc.body) return
-    if (countElements(el) >= 15) candidates.add(el)
-  })
 
-  // 3. Framer containers (most important for your site)
-  doc.querySelectorAll('div').forEach(el => {
+    const count = countElements(el)
     const cls = el.className?.toString() || ''
+    const isFramer = /framer-[a-z0-9]{5,}/.test(cls)
 
-    // Strong Framer class pattern
-    if (/framer-[a-z0-9]{5,}/.test(cls)) {
-      const count = countElements(el)
-      if (count >= 20) candidates.add(el)           // good balance for Framer
-    }
+    if (isFramer && count >= 25) candidates.add(el)
+    else if (count >= 40) candidates.add(el)           // large containers
   })
 
-  // 4. Large top-level containers (very common in Framer)
+  // Large direct body children (very common in Framer)
   if (doc.body) {
     Array.from(doc.body.children).forEach(child => {
-      if (countElements(child) >= 50) {
-        candidates.add(child)
-      }
+      if (countElements(child) >= 80) candidates.add(child)
     })
   }
 
-  // Deduplication: Keep only outermost containers
-  let filtered: Element[] = []
-  const sorted = Array.from(candidates).sort((a, b) => 
+  // Deduplication: keep only top-level (non-nested) sections
+  const sorted = Array.from(candidates).sort((a, b) =>
     a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
   )
 
+  const filtered: Element[] = []
   for (const el of sorted) {
-    const isDescendant = filtered.some(existing => existing !== el && existing.contains(el))
-    if (!isDescendant) {
+    if (!filtered.some(existing => existing.contains(el))) {
       filtered.push(el)
     }
   }
@@ -109,16 +91,16 @@ export function parseHTMLSections(htmlString: string): ParsedSection[] {
       elementCount: countElements(doc.body),
       html: doc.body.innerHTML,
       tagName: 'body',
-      depth: 0,                    // ← added
+      depth: 0,
     }]
   }
 
   return filtered.map((el, index) => ({
     id: nextId(),
-    label: getLabel(el, index),
+    label: getLabel(el),
     elementCount: countElements(el),
     html: el.outerHTML,
     tagName: el.tagName.toLowerCase(),
-    depth: getDepth(el),           // ← NEW: shows nesting depth
+    depth: getDepth(el),
   }))
 }
