@@ -36,14 +36,78 @@ export default function Step2Selection({
   const [renameValue, setRenameValue] = useState('')
 
   // Update iframe preview when selection or focus changes
-  useEffect(() => {
-    const iframe = iframeRef.current
-    if (!iframe) return
+// Replace the entire useEffect for iframe
+useEffect(() => {
+  const iframe = iframeRef.current
+  if (!iframe || !htmlContent) return
 
-    const highlightedSection = focusedId 
-      ? sections.find(s => s.id === focusedId) 
-      : null
+  const doc = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .preview-container {
+      width: 1440px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 30px 90px -15px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+      min-height: 900px;
+    }
+    [data-export-id] { position: relative; }
+    [data-export-selected] {
+      outline: 4px solid #f97316 !important;
+      outline-offset: -4px;
+    }
+    [data-export-focused] {
+      outline: 6px solid #fb923c !important;
+      outline-offset: -6px;
+      box-shadow: 0 0 0 10px rgba(251, 146, 60, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-container">
+    ${htmlContent}   {/* Original uploaded HTML */}
+  </div>
+</body>
+</html>`
 
+  iframe.srcdoc = doc
+
+  // Highlight after load
+  iframe.onload = () => {
+    try {
+      const contentDoc = iframe.contentDocument
+      if (!contentDoc) return
+
+      sections.forEach(section => {
+        const els = contentDoc.querySelectorAll('div, section')
+        els.forEach(el => {
+          if (el.outerHTML.length > 100 && section.html.includes(el.outerHTML.substring(0, 80))) {
+            el.setAttribute('data-export-id', section.id)
+            if (selectedIds.includes(section.id)) el.setAttribute('data-export-selected', '')
+            if (section.id === focusedId) {
+              el.setAttribute('data-export-focused', '')
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+          }
+        })
+      })
+    } catch (e) {
+      console.warn('Preview highlight failed', e)
+    }
+  }
+}, [htmlContent, sections, selectedIds, focusedId])
     const doc = `<!DOCTYPE html>
 <html>
 <head>
