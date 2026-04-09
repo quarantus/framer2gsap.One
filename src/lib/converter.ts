@@ -6,87 +6,21 @@ function nextClass(prefix = 'fc'): string {
   return `${prefix}-${++_classCounter}`
 }
 
-function parseTransformForGSAP(transform: string): Record<string, string> {
-  const result: Record<string, string> = {}
-  const matchers: Array<{ re: RegExp; key: string }> = [
-    { re: /translateX\(([^)]+)\)/, key: 'x' },
-    { re: /translateY\(([^)]+)\)/, key: 'y' },
-    { re: /rotate\(([^)]+)\)/, key: 'rotation' },
-    { re: /scaleX\(([^)]+)\)/, key: 'scaleX' },
-    { re: /scaleY\(([^)]+)\)/, key: 'scaleY' },
-    { re: /scale\(([^)]+)\)/, key: 'scale' },
-    { re: /skewX\(([^)]+)\)/, key: 'skewX' },
-    { re: /skewY\(([^)]+)\)/, key: 'skewY' },
-  ]
-  for (const { re, key } of matchers) {
-    const m = transform.match(re)
-    if (m) result[key] = m[1]
-  }
-  return result
-}
-
-function extractGSAPFromElement(el: Element, className: string): string[] {
-  const animations: string[] = []
-  const htmlEl = el as HTMLElement
-  const style = htmlEl.style
-
-  if (!style) return animations
-
-  const opacity = style.opacity
-  const transform = style.transform
-
-  if (opacity && opacity !== '1' && opacity !== '') {
-    animations.push(
-      `gsap.from(".${className}", { opacity: ${parseFloat(opacity)}, duration: 0.6, ease: "power2.out" });`
-    )
-  }
-
-  if (transform && transform !== 'none' && transform !== '') {
-    const props = parseTransformForGSAP(transform)
-    if (Object.keys(props).length > 0) {
-      const propsStr = Object.entries(props)
-        .map(([k, v]) => `${k}: "${v}"`)
-        .join(', ')
-      animations.push(
-        `gsap.from(".${className}", { ${propsStr}, duration: 0.8, ease: "power2.out" });`
-      )
-    }
-  }
-
-  // data-framer-motion-value attribute
-  const motionVal = el.getAttribute('data-framer-motion-value')
-  if (motionVal) {
-    try {
-      const parsed = JSON.parse(motionVal)
-      if (parsed.opacity !== undefined && Array.isArray(parsed.opacity)) {
-        animations.push(
-          `gsap.from(".${className}", { opacity: ${parsed.opacity[0] ?? 0}, duration: 0.6, ease: "power2.out" });`
-        )
-      }
-    } catch {
-      // ignore malformed
-    }
-  }
-
-  return animations
-}
+// ... (keep your existing parseTransformForGSAP and extractGSAPFromElement functions - they are good)
 
 function styleAttrToCSSDeclarations(styleAttr: string): string {
   return styleAttr
     .split(';')
-    .map((s) => s.trim())
+    .map(s => s.trim())
     .filter(Boolean)
     .join(';\n  ')
 }
 
-function processNodeStyles(
-  rootEl: Element,
-  cssRules: string[],
-  gsapAnimations: string[]
-): void {
-  const elements = [rootEl, ...Array.from(rootEl.querySelectorAll('[style]'))]
+function processNodeStyles(rootEl: Element, cssRules: string[], gsapAnimations: string[]): void {
+  const elementsWithStyle = rootEl.querySelectorAll('[style]')
+  const all = [rootEl, ...Array.from(elementsWithStyle)]
 
-  for (const el of elements) {
+  for (const el of all) {
     const styleAttr = el.getAttribute('style')
     if (!styleAttr?.trim()) continue
 
@@ -104,36 +38,28 @@ function processNodeStyles(
 
 function cleanFramerAttrs(el: Element): void {
   const attrsToStrip = [
-    'data-framer-name',
-    'data-framer-appear-id',
-    'data-framer-animation',
-    'data-framer-motion-value',
-    'data-framer-component-type',
+    'data-framer-name', 'data-framer-appear-id', 'data-framer-animation',
+    'data-framer-motion-value', 'data-framer-component-type', 'data-framer-variant'
   ]
-  const all = [el, ...Array.from(el.querySelectorAll('*'))]
-  for (const node of all) {
-    for (const attr of attrsToStrip) {
-      node.removeAttribute(attr)
-    }
+
+  const allNodes = [el, ...el.querySelectorAll('*')]
+  for (const node of allNodes) {
+    attrsToStrip.forEach(attr => node.removeAttribute(attr))
   }
 }
 
 function extractStylesFromDoc(htmlString: string): { base: string; media: string } {
   const parser = new DOMParser()
   const doc = parser.parseFromString(htmlString, 'text/html')
-
   let base = ''
   let media = ''
 
-  doc.querySelectorAll('style').forEach((styleEl) => {
+  doc.querySelectorAll('style').forEach(styleEl => {
     const text = styleEl.textContent || ''
     const mediaBlocks = text.match(/@media[^{]+\{[\s\S]*?\}\s*\}/g) || []
     media += mediaBlocks.join('\n\n') + '\n'
 
-    const stripped = text
-      .replace(/@media[^{]+\{[\s\S]*?\}\s*\}/g, '')
-      .replace(/@import[^;]+;/g, '')
-      .trim()
+    const stripped = text.replace(/@media[^{]+\{[\s\S]*?\}\s*\}/g, '').replace(/@import[^;]+;/g, '').trim()
     if (stripped) base += stripped + '\n'
   })
 
@@ -148,25 +74,25 @@ export function convertSections(
 ): OutputFiles {
   _classCounter = 0
 
-  const selected = sections.filter((s) => selectedIds.includes(s.id))
+  const selected = sections.filter(s => selectedIds.includes(s.id))
   const cssRules: string[] = []
   const gsapAnimations: string[] = []
+
   const { base: baseCSS, media: mediaCSS } = extractStylesFromDoc(originalHtml)
 
-  const sectionBlocks = selected.map((section) => {
+  const sectionBlocks = selected.map(section => {
     const parser = new DOMParser()
-    const frag = parser.parseFromString(
-      `<!DOCTYPE html><html><body>${section.html}</body></html>`,
-      'text/html'
-    )
+    const frag = parser.parseFromString(`<body>${section.html}</body>`, 'text/html')
     const el = frag.body.firstElementChild
-    if (!el) return `<!-- empty section: ${section.id} -->`
+    if (!el) return `<!-- Empty: ${section.id} -->`
 
     processNodeStyles(el, cssRules, gsapAnimations)
     cleanFramerAttrs(el)
 
-    const name = renames[section.id] || section.label
-    return `<!-- Section: ${name} -->\n${el.outerHTML}`
+    const name = renames[section.id] || section.label || 'Section'
+    const depthTag = section.depth !== undefined ? ` depth-${section.depth}` : ''
+
+    return `<!-- ${name}${depthTag} -->\n<div class="framer-section${depthTag}">\n${el.outerHTML}\n</div>`
   })
 
   const html = `<!DOCTYPE html>
@@ -174,13 +100,11 @@ export function convertSections(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Exported from Framer</title>
+  <title>Framer Export</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
 ${sectionBlocks.join('\n\n')}
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
   <script src="animations.js"></script>
@@ -188,47 +112,32 @@ ${sectionBlocks.join('\n\n')}
 </html>`
 
   const css = [
-    '/* ========================================',
-    '   Base styles extracted from Framer source',
-    '   ======================================== */',
-    baseCSS,
+    '/* Base Framer styles */',
+    baseCSS.trim(),
     '',
-    '/* ========================================',
-    '   Component classes (converted from inline)',
-    '   ======================================== */',
+    '/* Converted inline styles */',
     cssRules.join('\n\n'),
     '',
-    '/* ========================================',
-    '   Media queries',
-    '   ======================================== */',
-    mediaCSS,
+    '/* Media queries */',
+    mediaCSS.trim(),
+    '',
+    '/* Section wrapper */',
+    '.framer-section { margin-bottom: 80px; }'
   ].join('\n')
 
-  const gsapBlock =
-    gsapAnimations.length > 0
-      ? gsapAnimations.join('\n')
-      : '// No inline animation attributes detected — scroll animations added below'
+  const js = `gsap.registerPlugin(ScrollTrigger);
 
-  const js = `// GSAP Animations — Generated by Framer to Code Exporter
-// Requires GSAP 3.x + ScrollTrigger plugin
+${gsapAnimations.join('\n') || '// No inline animations detected'}
 
-gsap.registerPlugin(ScrollTrigger);
-
-/* ── Detected inline animations ── */
-${gsapBlock}
-
-/* ── Scroll-triggered entrance animations ── */
-gsap.utils.toArray("section, article, header, footer, main").forEach((el) => {
+// Scroll animations
+document.querySelectorAll('.framer-section').forEach((el, i) => {
   gsap.from(el, {
-    scrollTrigger: {
-      trigger: el,
-      start: "top 82%",
-      toggleActions: "play none none reverse",
-    },
+    scrollTrigger: { trigger: el, start: "top 80%" },
     opacity: 0,
-    y: 24,
-    duration: 0.7,
-    ease: "power2.out",
+    y: 60,
+    duration: 1,
+    ease: "power3.out",
+    delay: Math.min(i * 0.08, 0.6)
   });
 });
 `
