@@ -35,66 +35,90 @@ export default function Step2Selection({
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
-  // Update iframe when selection changes
+  // Update iframe preview when selection or focus changes
   useEffect(() => {
     const iframe = iframeRef.current
-    if (!iframe || !htmlContent) return
+    if (!iframe) return
 
-    const highlighted = focusedId
-      ? sections.find((s) => s.id === focusedId)
+    const highlightedSection = focusedId 
+      ? sections.find(s => s.id === focusedId) 
       : null
 
-    const injectStyle = highlighted
-      ? `<style>
-          .framer-export-highlight { outline: 3px solid #f97316 !important; outline-offset: 2px !important; }
-        </style>`
-      : ''
-
-    // Mark selected sections in preview
     const doc = `<!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-${injectStyle}
-<style>
-  body { background: #18181b; color: #e4e4e7; }
-  [data-export-id] { outline: 1px dashed rgba(249,115,22,0.3); }
-  [data-export-selected] { outline: 2px solid rgba(249,115,22,0.6) !important; }
-  [data-export-focused] { outline: 3px solid #f97316 !important; outline-offset: 2px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      background: #0a0a0a;
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+      font-family: system-ui, sans-serif;
+    }
+    
+    .preview-wrapper {
+      width: 1440px;
+      background: white;
+      box-shadow: 0 25px 80px -15px rgba(0, 0, 0, 0.6);
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 900px;
+    }
+
+    .framer-section {
+      scroll-margin-top: 80px;
+    }
+
+    [data-export-id] {
+      position: relative;
+    }
+    [data-export-selected] {
+      outline: 3px solid #f97316 !important;
+      outline-offset: -3px;
+    }
+    [data-export-focused] {
+      outline: 5px solid #fb923c !important;
+      outline-offset: -5px;
+      box-shadow: 0 0 0 8px rgba(249, 115, 22, 0.2);
+    }
+  </style>
 </head>
 <body>
-${sections
-  .map((s) => {
-    const attrs = [
-      `data-export-id="${s.id}"`,
-      selectedIds.includes(s.id) ? 'data-export-selected' : '',
-      s.id === focusedId ? 'data-export-focused' : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
-    return `<div ${attrs}>${s.html}</div>`
-  })
-  .join('\n')}
+  <div class="preview-wrapper">
+    ${sections
+      .map((s) => {
+        const isSelected = selectedIds.includes(s.id)
+        const isFocused = s.id === focusedId
+
+        const attrs = [
+          `data-export-id="${s.id}"`,
+          isSelected ? 'data-export-selected' : '',
+          isFocused ? 'data-export-focused' : '',
+          `class="framer-section"`,
+        ].filter(Boolean).join(' ')
+
+        return `<div ${attrs}>${s.html}</div>`
+      })
+      .join('\n')}
+  </div>
 </body>
 </html>`
 
     iframe.srcdoc = doc
 
-    // Scroll to focused section after load
+    // Auto-scroll to focused section
     if (focusedId) {
-      const onLoad = () => {
+      iframe.onload = () => {
         try {
-          const el = iframe.contentDocument?.querySelector(`[data-export-focused]`)
-          el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        } catch {
-          // cross-origin safety
-        }
+          const focusedEl = iframe.contentDocument?.querySelector('[data-export-focused]')
+          focusedEl?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        } catch (_) {}
       }
-      iframe.addEventListener('load', onLoad, { once: true })
     }
-  }, [htmlContent, sections, selectedIds, focusedId])
+  }, [sections, selectedIds, focusedId])
 
   const startRename = (section: ParsedSection) => {
     setRenamingId(section.id)
@@ -111,61 +135,50 @@ ${sections
   const noneSelected = selectedIds.length === 0
 
   return (
-    <div className="step-panel min-h-screen flex flex-col">
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-10">
+    <div className="step-panel min-h-screen flex flex-col bg-zinc-950">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-sm sticky top-0 z-20">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 text-zinc-400 hover:text-white text-sm transition-colors"
+            className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
           >
-            <span className="material-symbols-sharp text-[18px]">arrow_back</span>
+            <span className="material-symbols-sharp">arrow_back</span>
             Back
           </button>
-          <span className="text-zinc-700">|</span>
+          <span className="text-zinc-700">•</span>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20">
-              <span className="text-orange-400 text-xs font-medium">Step 2 of 3</span>
+            <span className="px-3 py-1 text-xs font-medium rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
+              Step 2 of 3
             </span>
-            <h2 className="text-white font-semibold text-sm">Select Sections</h2>
+            <h2 className="text-white font-semibold">Select &amp; Review Sections</h2>
           </div>
         </div>
+
         <button
           onClick={onProcess}
           disabled={noneSelected || processing}
-          className="flex items-center gap-2 px-5 py-2 rounded-lg bg-orange-500 text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-orange-400 transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 disabled:text-zinc-400 text-white font-semibold rounded-xl transition-all active:scale-95"
         >
-          <span className="material-symbols-sharp text-[18px]">code</span>
-          Process {selectedIds.length > 0 && `(${selectedIds.length})`}
+          <span className="material-symbols-sharp">code</span>
+          Convert {selectedIds.length > 0 && `(${selectedIds.length})`}
         </button>
       </div>
 
-      {/* Two-column body */}
-      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 65px)' }}>
-        {/* Left: Section list */}
-        <div className="w-72 lg:w-80 flex-shrink-0 border-r border-zinc-800 bg-zinc-950 flex flex-col">
-          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-            <span className="text-zinc-400 text-xs">
-              {sections.length} section{sections.length !== 1 ? 's' : ''} found
+      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 69px)' }}>
+        {/* Left Sidebar - Section List */}
+        <div className="w-80 border-r border-zinc-800 bg-zinc-950 flex flex-col">
+          <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900">
+            <span className="text-sm text-zinc-400">
+              {sections.length} sections detected
             </span>
-            <div className="flex gap-2">
-              <button
-                onClick={onSelectAll}
-                className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
-              >
-                All
-              </button>
-              <span className="text-zinc-700">·</span>
-              <button
-                onClick={onDeselectAll}
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                None
-              </button>
+            <div className="flex gap-3 text-xs">
+              <button onClick={onSelectAll} className="text-orange-400 hover:text-orange-300">Select All</button>
+              <button onClick={onDeselectAll} className="text-zinc-500 hover:text-zinc-300">Deselect All</button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto py-2">
+          <div className="flex-1 overflow-y-auto">
             {sections.map((section) => {
               const isSelected = selectedIds.includes(section.id)
               const isFocused = focusedId === section.id
@@ -174,35 +187,31 @@ ${sections
               return (
                 <div
                   key={section.id}
-                  className={`group flex items-start gap-3 px-4 py-3 cursor-pointer border-l-2 transition-all ${
-                    isFocused
-                      ? 'border-orange-500 bg-orange-500/5'
-                      : isSelected
-                      ? 'border-orange-500/30 bg-zinc-900/40'
-                      : 'border-transparent hover:bg-zinc-900/40'
-                  }`}
                   onClick={() => setFocusedId(isFocused ? null : section.id)}
+                  className={`group px-4 py-4 border-l-4 flex gap-4 cursor-pointer transition-all hover:bg-zinc-900/50 ${
+                    isFocused
+                      ? 'border-orange-500 bg-orange-500/10'
+                      : isSelected
+                      ? 'border-orange-500/40 bg-zinc-900/30'
+                      : 'border-transparent'
+                  }`}
                 >
+                  {/* Checkbox */}
                   <div
-                    className="mt-0.5 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       onToggle(section.id)
                     }}
+                    className={`mt-1 w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                      isSelected
+                        ? 'bg-orange-500 border-orange-500'
+                        : 'border-zinc-600 group-hover:border-orange-400'
+                    }`}
                   >
-                    <div
-                      className={`w-4 h-4 rounded border transition-colors flex items-center justify-center ${
-                        isSelected
-                          ? 'bg-orange-500 border-orange-500'
-                          : 'border-zinc-600 hover:border-orange-400'
-                      }`}
-                    >
-                      {isSelected && (
-                        <span className="material-symbols-sharp text-white text-[12px]">check</span>
-                      )}
-                    </div>
+                    {isSelected && <span className="material-symbols-sharp text-white text-sm">check</span>}
                   </div>
 
+                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     {renamingId === section.id ? (
                       <input
@@ -214,32 +223,28 @@ ${sections
                           if (e.key === 'Enter') commitRename()
                           if (e.key === 'Escape') setRenamingId(null)
                         }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full bg-zinc-800 border border-orange-500/50 rounded px-2 py-0.5 text-sm text-white outline-none"
+                        className="w-full bg-zinc-800 border border-orange-400 rounded px-3 py-1 text-sm outline-none"
                       />
                     ) : (
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`text-sm font-medium truncate ${
-                            isSelected ? 'text-white' : 'text-zinc-300'
-                          }`}
-                        >
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium text-sm truncate ${isSelected ? 'text-white' : 'text-zinc-200'}`}>
                           {displayName}
                         </span>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            startRename(section)
-                          }}
-                          className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-zinc-400 transition-all"
+                          onClick={(e) => { e.stopPropagation(); startRename(section) }}
+                          className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300"
                         >
-                          <span className="material-symbols-sharp text-[14px]">edit</span>
+                          <span className="material-symbols-sharp text-base">edit</span>
                         </button>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-zinc-600 font-mono">&lt;{section.tagName}&gt;</span>
-                      <span className="text-xs text-zinc-600">{section.elementCount} el</span>
+
+                    <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
+                      <span className="font-mono">&lt;{section.tagName}&gt;</span>
+                      <span>{section.elementCount} elements</span>
+                      {section.depth !== undefined && (
+                        <span className="px-1.5 py-0.5 bg-zinc-800 rounded">depth {section.depth}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -248,27 +253,34 @@ ${sections
           </div>
         </div>
 
-        {/* Right: Preview */}
-        <div className="flex-1 bg-zinc-900 relative overflow-hidden">
-          <div className="absolute top-3 left-3 z-10 text-xs text-zinc-600 bg-zinc-900/80 px-2 py-1 rounded border border-zinc-800 backdrop-blur-sm">
-            <span className="material-symbols-sharp text-[12px] align-middle mr-1">preview</span>
-            Live Preview — click sections on left to highlight
+        {/* Right: Desktop Preview */}
+        <div className="flex-1 bg-zinc-900 relative flex items-center justify-center overflow-auto p-8">
+          <div className="absolute top-6 left-6 z-10 text-xs text-zinc-500 bg-zinc-950/80 px-4 py-2 rounded-xl border border-zinc-800 backdrop-blur">
+            Desktop Preview • 1440px • Click left panel to highlight
           </div>
+
           <iframe
             ref={iframeRef}
             sandbox="allow-same-origin"
-            className="w-full h-full border-0"
-            title="HTML Preview"
+            className="shadow-2xl rounded-2xl border border-zinc-800 overflow-hidden"
+            style={{
+              width: '1440px',
+              height: '900px',
+              maxWidth: '100%',
+              transform: 'scale(0.95)',
+              transformOrigin: 'top center',
+            }}
+            title="Framer Export Preview"
           />
         </div>
       </div>
 
-      {/* Loading overlay */}
+      {/* Processing Overlay */}
       {processing && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-6">
-            <div className="loader-ring" />
-            <p className="text-orange-400 text-lg font-medium animate-pulse">{processingStage}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-5">
+            <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-orange-400 text-xl font-medium tracking-wide">{processingStage}</p>
           </div>
         </div>
       )}
