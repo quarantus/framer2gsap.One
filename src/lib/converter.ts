@@ -6,7 +6,6 @@ function nextClass(prefix = 'fc'): string {
   return `${prefix}-${++_classCounter}`
 }
 
-// Keep these helper functions (they were already good)
 function parseTransformForGSAP(transform: string): Record<string, string> {
   const result: Record<string, string> = {}
   const matchers = [
@@ -43,7 +42,6 @@ function extractGSAPFromElement(el: Element, className: string): string[] {
       animations.push(`gsap.from(".${className}", { ${propsStr}, duration: 0.8, ease: "power2.out" });`)
     }
   }
-
   return animations
 }
 
@@ -105,7 +103,7 @@ function extractStylesFromDoc(htmlString: string): { base: string; media: string
   return { base, media }
 }
 
-// ←←← THIS IS THE IMPORTANT PART ←←←
+// ====================== MAIN EXPORT ======================
 export function convertSections(
   sections: ParsedSection[],
   selectedIds: string[],
@@ -161,6 +159,7 @@ ${sectionBlocks.join('\n\n')}
   ].filter(Boolean).join('\n')
 
   const js = `gsap.registerPlugin(ScrollTrigger);
+
 ${gsapAnimations.join('\n') || '// No inline animations detected'}
 
 // Scroll animations
