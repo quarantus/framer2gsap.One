@@ -246,26 +246,29 @@ export default function Step2Selection({
             })}
           </div>
         </div>
+{/* Right: Desktop Preview */}
+<div className="flex-1 bg-zinc-900 relative flex flex-col overflow-hidden">
+  {/* Preview Header */}
+  <div className="absolute top-6 left-6 z-20 text-xs text-zinc-500 bg-zinc-950/80 px-4 py-2 rounded-xl border border-zinc-800 backdrop-blur">
+    Desktop Preview • 1440px • Click sections on the left to highlight
+  </div>
 
-        {/* Right: Desktop Preview */}
-        <div className="flex-1 bg-zinc-900 relative flex items-center justify-center overflow-auto p-8">
-          <div className="absolute top-6 left-6 z-10 text-xs text-zinc-500 bg-zinc-950/80 px-4 py-2 rounded-xl border border-zinc-800 backdrop-blur">
-            Desktop Preview • 1440px
-          </div>
-
-          <iframe
-            ref={iframeRef}
-            sandbox="allow-same-origin"
-            className="shadow-2xl rounded-2xl border border-zinc-800 overflow-hidden"
-            style={{
-              width: '1440px',
-              height: '900px',
-              maxWidth: '100%',
-            }}
-            title="Framer Export Preview"
-          />
-        </div>
-      </div>
+  {/* Scrollable centered preview area */}
+  <div className="flex-1 flex items-start justify-center pt-20 pb-12 overflow-auto">
+    <iframe
+      ref={iframeRef}
+      sandbox="allow-same-origin"
+      className="shadow-2xl rounded-2xl border border-zinc-800 overflow-hidden bg-white"
+      style={{
+        width: '1440px',
+        height: '900px',
+        maxWidth: '95vw',
+        minHeight: '900px',
+      }}
+      title="Framer Export Preview"
+    />
+  </div>
+</div>
 
       {/* Processing Overlay */}
       {processing && (
