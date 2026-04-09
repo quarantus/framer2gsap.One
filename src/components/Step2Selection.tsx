@@ -35,86 +35,94 @@ export default function Step2Selection({
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
-  // ==================== PREVIEW useEffect ====================
-  useEffect(() => {
-    const iframe = iframeRef.current
-    if (!iframe || !htmlContent) return
+// ==================== FIXED PREVIEW useEffect ====================
+useEffect(() => {
+  const iframe = iframeRef.current
+  if (!iframe || !htmlContent) return
 
-    const previewHTML = `<!DOCTYPE html>
+  // Use the ORIGINAL uploaded HTML directly - no rebuilding
+  const previewHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Preview</title>
+  <title>Framer Preview</title>
   <style>
     body, html {
       margin: 0;
       padding: 40px 20px;
-      background: #111;
+      background: #0f0f0f;
       height: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
+      overflow: auto;
     }
     .desktop-frame {
       width: 1440px;
-      max-width: 95vw;
-      height: 900px;
+      max-width: 96vw;
+      min-height: 900px;
       background: white;
-      border-radius: 16px;
-      box-shadow: 0 30px 90px -15px rgba(0, 0, 0, 0.75);
-      overflow: auto;
-      border: 14px solid #1f1f1f;
+      border-radius: 20px;
+      box-shadow: 0 30px 100px -20px rgba(0, 0, 0, 0.8);
+      overflow: visible;
+      border: 16px solid #1a1a1a;
     }
+    /* Highlight styles */
     [data-export-id] { position: relative; }
     [data-export-selected] {
-      outline: 4px solid #f97316 !important;
-      outline-offset: -4px;
+      outline: 5px solid #f97316 !important;
+      outline-offset: -5px;
+      box-shadow: 0 0 0 8px rgba(249, 115, 22, 0.2);
     }
     [data-export-focused] {
-      outline: 6px solid #fb923c !important;
-      outline-offset: -6px;
-      box-shadow: 0 0 0 12px rgba(251, 146, 60, 0.25);
+      outline: 7px solid #fb923c !important;
+      outline-offset: -7px;
+      box-shadow: 0 0 0 15px rgba(251, 146, 60, 0.3);
     }
   </style>
 </head>
 <body>
   <div class="desktop-frame">
-    ${htmlContent}
+    ${htmlContent}   {/* ← Full original uploaded HTML */}
   </div>
 </body>
 </html>`
 
-    iframe.srcdoc = previewHTML
+  iframe.srcdoc = previewHTML
 
-    // Highlight selected and focused sections
-    iframe.onload = () => {
-      try {
-        const doc = iframe.contentDocument
-        if (!doc) return
+  // Simple & fast highlighting
+  const highlightTimeout = setTimeout(() => {
+    try {
+      const doc = iframe.contentDocument
+      if (!doc) return
 
-        sections.forEach((section) => {
-          const allContainers = doc.querySelectorAll('div, section')
-          allContainers.forEach((el) => {
-            if (el.outerHTML.length > 80 && section.html.includes(el.outerHTML.substring(0, 100))) {
-              el.setAttribute('data-export-id', section.id)
+      sections.forEach((section) => {
+        // Fast matching using first 120 characters
+        const containers = doc.querySelectorAll('div, section, header, main, article')
+        containers.forEach((el: Element) => {
+          if (el.outerHTML && section.html && 
+              el.outerHTML.substring(0, 120) === section.html.substring(0, 120)) {
+            
+            el.setAttribute('data-export-id', section.id)
 
-              if (selectedIds.includes(section.id)) {
-                el.setAttribute('data-export-selected', '')
-              }
-              if (section.id === focusedId) {
-                el.setAttribute('data-export-focused', '')
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              }
+            if (selectedIds.includes(section.id)) {
+              el.setAttribute('data-export-selected', '')
             }
-          })
+            if (section.id === focusedId) {
+              el.setAttribute('data-export-focused', '')
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+          }
         })
-      } catch (e) {
-        console.warn('Preview highlighting failed', e)
-      }
+      })
+    } catch (e) {
+      console.warn('Highlighting skipped', e)
     }
-  }, [htmlContent, sections, selectedIds, focusedId])
+  }, 300) // small delay to let iframe render
+
+  return () => clearTimeout(highlightTimeout)
+}, [htmlContent, sections, selectedIds, focusedId])
 
   const startRename = (section: ParsedSection) => {
     setRenamingId(section.id)
@@ -247,25 +255,22 @@ export default function Step2Selection({
           </div>
         </div>
 {/* Right: Desktop Preview */}
-<div className="flex-1 bg-zinc-900 relative flex flex-col overflow-hidden">
-  {/* Preview Header */}
-  <div className="absolute top-6 left-6 z-20 text-xs text-zinc-500 bg-zinc-950/80 px-4 py-2 rounded-xl border border-zinc-800 backdrop-blur">
-    Desktop Preview • 1440px • Click sections on the left to highlight
+{/* Right: Desktop Preview */}
+<div className="flex-1 bg-zinc-900 relative flex items-center justify-center overflow-auto p-8">
+  <div className="absolute top-6 left-6 z-10 text-xs text-zinc-500 bg-zinc-950/80 px-4 py-2 rounded-xl border border-zinc-800 backdrop-blur">
+    Desktop Preview • 1440px • Click sections on left to highlight
   </div>
 
-  {/* Scrollable centered preview area */}
-  <div className="flex-1 flex items-start justify-center pt-20 pb-12 overflow-auto">
-    <iframe
-      ref={iframeRef}
-      sandbox="allow-same-origin"
-      className="shadow-2xl rounded-2xl border border-zinc-800 overflow-hidden bg-white"
-      style={{
-        width: '1440px',
-        height: '900px',
-        maxWidth: '95vw',
-        minHeight: '900px',
-      }}
-      title="Framer Export Preview"
+  <iframe
+    ref={iframeRef}
+    sandbox="allow-same-origin"
+    className="shadow-2xl rounded-2xl border border-zinc-800 overflow-hidden"
+    style={{
+      width: '1440px',
+      height: '900px',
+      maxWidth: '100%',
+    }}
+    title="Framer Export Preview"
     />
   </div>
 </div>
