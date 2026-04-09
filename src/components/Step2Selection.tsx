@@ -35,33 +35,37 @@ export default function Step2Selection({
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
-  // Update iframe preview when selection or focus changes
-// Replace the entire useEffect for iframe
-useEffect(() => {
-  const iframe = iframeRef.current
-  if (!iframe || !htmlContent) return
+  // ==================== PREVIEW useEffect ====================
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe || !htmlContent) return
 
-  const doc = `<!DOCTYPE html>
-<html>
+    const previewHTML = `<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview</title>
   <style>
-    body {
+    body, html {
       margin: 0;
       padding: 40px 20px;
       background: #111;
+      height: 100%;
       display: flex;
+      align-items: center;
       justify-content: center;
-      min-height: 100vh;
+      overflow: hidden;
     }
-    .preview-container {
+    .desktop-frame {
       width: 1440px;
+      max-width: 95vw;
+      height: 900px;
       background: white;
       border-radius: 16px;
-      box-shadow: 0 30px 90px -15px rgba(0, 0, 0, 0.8);
-      overflow: hidden;
-      min-height: 900px;
+      box-shadow: 0 30px 90px -15px rgba(0, 0, 0, 0.75);
+      overflow: auto;
+      border: 14px solid #1f1f1f;
     }
     [data-export-id] { position: relative; }
     [data-export-selected] {
@@ -71,118 +75,46 @@ useEffect(() => {
     [data-export-focused] {
       outline: 6px solid #fb923c !important;
       outline-offset: -6px;
-      box-shadow: 0 0 0 10px rgba(251, 146, 60, 0.3);
+      box-shadow: 0 0 0 12px rgba(251, 146, 60, 0.25);
     }
   </style>
 </head>
 <body>
-  <div class="preview-container">
-    ${htmlContent}   {/* Original uploaded HTML */}
+  <div class="desktop-frame">
+    ${htmlContent}
   </div>
 </body>
 </html>`
 
-  iframe.srcdoc = doc
+    iframe.srcdoc = previewHTML
 
-  // Highlight after load
-  iframe.onload = () => {
-    try {
-      const contentDoc = iframe.contentDocument
-      if (!contentDoc) return
+    // Highlight selected and focused sections
+    iframe.onload = () => {
+      try {
+        const doc = iframe.contentDocument
+        if (!doc) return
 
-      sections.forEach(section => {
-        const els = contentDoc.querySelectorAll('div, section')
-        els.forEach(el => {
-          if (el.outerHTML.length > 100 && section.html.includes(el.outerHTML.substring(0, 80))) {
-            el.setAttribute('data-export-id', section.id)
-            if (selectedIds.includes(section.id)) el.setAttribute('data-export-selected', '')
-            if (section.id === focusedId) {
-              el.setAttribute('data-export-focused', '')
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        sections.forEach((section) => {
+          const allContainers = doc.querySelectorAll('div, section')
+          allContainers.forEach((el) => {
+            if (el.outerHTML.length > 80 && section.html.includes(el.outerHTML.substring(0, 100))) {
+              el.setAttribute('data-export-id', section.id)
+
+              if (selectedIds.includes(section.id)) {
+                el.setAttribute('data-export-selected', '')
+              }
+              if (section.id === focusedId) {
+                el.setAttribute('data-export-focused', '')
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              }
             }
-          }
+          })
         })
-      })
-    } catch (e) {
-      console.warn('Preview highlight failed', e)
-    }
-  }
-}, [htmlContent, sections, selectedIds, focusedId])
-    const doc = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      background: #0a0a0a;
-      margin: 0;
-      padding: 40px 20px;
-      display: flex;
-      justify-content: center;
-      font-family: system-ui, sans-serif;
-    }
-    
-    .preview-wrapper {
-      width: 1440px;
-      background: white;
-      box-shadow: 0 25px 80px -15px rgba(0, 0, 0, 0.6);
-      border-radius: 12px;
-      overflow: hidden;
-      min-height: 900px;
-    }
-
-    .framer-section {
-      scroll-margin-top: 80px;
-    }
-
-    [data-export-id] {
-      position: relative;
-    }
-    [data-export-selected] {
-      outline: 3px solid #f97316 !important;
-      outline-offset: -3px;
-    }
-    [data-export-focused] {
-      outline: 5px solid #fb923c !important;
-      outline-offset: -5px;
-      box-shadow: 0 0 0 8px rgba(249, 115, 22, 0.2);
-    }
-  </style>
-</head>
-<body>
-  <div class="preview-wrapper">
-    ${sections
-      .map((s) => {
-        const isSelected = selectedIds.includes(s.id)
-        const isFocused = s.id === focusedId
-
-        const attrs = [
-          `data-export-id="${s.id}"`,
-          isSelected ? 'data-export-selected' : '',
-          isFocused ? 'data-export-focused' : '',
-          `class="framer-section"`,
-        ].filter(Boolean).join(' ')
-
-        return `<div ${attrs}>${s.html}</div>`
-      })
-      .join('\n')}
-  </div>
-</body>
-</html>`
-
-    iframe.srcdoc = doc
-
-    // Auto-scroll to focused section
-    if (focusedId) {
-      iframe.onload = () => {
-        try {
-          const focusedEl = iframe.contentDocument?.querySelector('[data-export-focused]')
-          focusedEl?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        } catch (_) {}
+      } catch (e) {
+        console.warn('Preview highlighting failed', e)
       }
     }
-  }, [sections, selectedIds, focusedId])
+  }, [htmlContent, sections, selectedIds, focusedId])
 
   const startRename = (section: ParsedSection) => {
     setRenamingId(section.id)
@@ -230,7 +162,7 @@ useEffect(() => {
       </div>
 
       <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 69px)' }}>
-        {/* Left Sidebar - Section List */}
+        {/* Left: Section List */}
         <div className="w-80 border-r border-zinc-800 bg-zinc-950 flex flex-col">
           <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900">
             <span className="text-sm text-zinc-400">
@@ -260,7 +192,6 @@ useEffect(() => {
                       : 'border-transparent'
                   }`}
                 >
-                  {/* Checkbox */}
                   <div
                     onClick={(e) => {
                       e.stopPropagation()
@@ -275,7 +206,6 @@ useEffect(() => {
                     {isSelected && <span className="material-symbols-sharp text-white text-sm">check</span>}
                   </div>
 
-                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     {renamingId === section.id ? (
                       <input
@@ -305,7 +235,7 @@ useEffect(() => {
 
                     <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
                       <span className="font-mono">&lt;{section.tagName}&gt;</span>
-                      <span>{section.elementCount} elements</span>
+                      <span>{section.elementCount} els</span>
                       {section.depth !== undefined && (
                         <span className="px-1.5 py-0.5 bg-zinc-800 rounded">depth {section.depth}</span>
                       )}
@@ -320,7 +250,7 @@ useEffect(() => {
         {/* Right: Desktop Preview */}
         <div className="flex-1 bg-zinc-900 relative flex items-center justify-center overflow-auto p-8">
           <div className="absolute top-6 left-6 z-10 text-xs text-zinc-500 bg-zinc-950/80 px-4 py-2 rounded-xl border border-zinc-800 backdrop-blur">
-            Desktop Preview • 1440px • Click left panel to highlight
+            Desktop Preview • 1440px
           </div>
 
           <iframe
@@ -331,8 +261,6 @@ useEffect(() => {
               width: '1440px',
               height: '900px',
               maxWidth: '100%',
-              transform: 'scale(0.95)',
-              transformOrigin: 'top center',
             }}
             title="Framer Export Preview"
           />
