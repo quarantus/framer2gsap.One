@@ -269,7 +269,7 @@ export default function Step2Selection({
     />
   </div>
 </div>
-
+      </div>
       {/* Processing Overlay */}
       {processing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
